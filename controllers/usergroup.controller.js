@@ -36,10 +36,11 @@ exports.create = (req, res) => {
   // Save User group in the database
   UserGroup.create(usergroup)
     .then(data => {
-      sendActionMessage("USERGROUP_CREATED", data)
+      kafkaClient.sendActionMessage("USERGROUP_CREATE_SUCCESS", data)
       res.send(data);
     })
     .catch(err => {
+      kafkaClient.sendActionMessage("USERGROUP_CREATE_FAIL", req.body)
       res.status(500).send({
         message:
           err.message || "Some error occurred while creating the User group."
@@ -90,17 +91,19 @@ exports.update = (req, res) => {
     })
       .then(num => {
         if (num == 1) {
-          sendActionMessage("USERGROUP_UPDATED", data)
+          kafkaClient.sendActionMessage("USERGROUP_UPDATE_SUCCESS", req.params)
           res.send({
             message: "User Group was updated successfully."
           });
         } else {
+          kafkaClient.sendActionMessage("USERGROUP_UPDATE_FAIL", req.params)
           res.send({
             message: `Cannot update User group with id=${id}. Maybe User group was not found or req.body is empty!`
           });
         }
       })
       .catch(err => {
+        kafkaClient.sendActionMessage("USERGROUP_UPDATE_FAIL", req.params)
         res.status(500).send({
           message: "Error updating User group with id=" + id
         });
@@ -115,17 +118,19 @@ exports.delete = (req, res) => {
     })
       .then(num => {
         if (num == 1) {
-          sendActionMessage("USERGROUP_DELETED", data)
+          kafkaClient.sendActionMessage("USERGROUP_DELETE_SUCCESS", req.params)
           res.send({
             message: "User Group was deleted successfully!"
           });
         } else {
+          kafkaClient.sendActionMessage("USERGROUP_DELETE_FAIL", req.params)
           res.send({
             message: `Cannot delete User group with id=${id}. Maybe User group was not found!`
           });
         }
       })
       .catch(err => {
+        kafkaClient.sendActionMessage("USERGROUP_DELETE_FAIL", req.params)
         res.status(500).send({
           message: "Could not delete User group with id=" + id
         });
@@ -139,35 +144,14 @@ exports.deleteAll = (req, res) => {
         truncate: false
       })
         .then(nums => {
-          sendActionMessage("USERGROUP_FLUSHED", data)
+          kafkaClient.sendActionMessage("USERGROUP_FLUSH_SUCCESS", {})
           res.send({ message: `${nums} User groups were deleted successfully!` });
         })
         .catch(err => {
+          kafkaClient.sendActionMessage("USERGROUP_FLUSH_FAIL", {})
           res.status(500).send({
             message:
               err.message || "Some error occurred while removing all User groups."
           });
         });
 };
-
-function sendActionMessage(action, payload, traceId = uuidv4()) {
-  console.log("Sending message to topic :: " + kafkaConfig.KAFKA_TOPIC)
-  message = { "traceId": traceId, "action": action, "payload": payload }
-  if(action){
-    producer.send({
-      topic: kafkaConfig.KAFKA_TOPIC,
-      messages: [
-        {
-          key: null, value: JSON.stringify(message)
-        }
-      ],
-    }).then(()=>{
-      console.log("action message sent successfully")
-    })
-    .catch((err)=>{
-      console.log(err)
-    })
-  }else{
-    console.log("Action not specified")
-  }
-}
