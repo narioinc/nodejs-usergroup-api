@@ -1,4 +1,5 @@
 module.exports = (sequelize, Sequelize) => {
+    console.log(sequelize.models)
     const Membership = sequelize.define("membership", {
         id: {
             type: Sequelize.UUID,
@@ -12,6 +13,10 @@ module.exports = (sequelize, Sequelize) => {
         groupId: {
             type: Sequelize.UUID,
             allowNull: false,
+            references: {
+                model: sequelize.models.usergroup,
+                key: 'id'
+              }
         }
     });
     return Membership;

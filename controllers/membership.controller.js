@@ -18,19 +18,21 @@ exports.create = (req, res) => {
     return;
   }
   // Create a Membership
-  const user = {
+  const membership = {
     userId: req.body.userId,
     groupId: req.body.groupId
   };
   // Save Membership in the database
-  User.create(user)
+  Membership.create(membership)
     .then(data => {
+      kafkaClient.sendActionMessage("MEMBERSHIP_CREATE_SUCCESS", data)
       res.send(data);
     })
     .catch(err => {
+      kafkaClient.sendActionMessage("MEMBERSHIP_CREATE_FAIL", req.body)
       res.status(500).send({
         message:
-          err.message || "Some error occurred while creating the User group."
+          err.message || "Some error occurred while creating the Membership."
       });
     });
 
@@ -39,7 +41,7 @@ exports.create = (req, res) => {
 exports.findAll = (req, res) => {
   const userId = req.query.userId;
   var condition = userId ? { userId: { [Op.like]: `%${userId}%` } } : null;
-  User.findAll({ where: condition })
+  Membership.findAll({ where: condition })
     .then(data => {
       res.send(data);
     })
@@ -54,7 +56,7 @@ exports.findAll = (req, res) => {
 // Find a single Membership with an id
 exports.findOne = (req, res) => {
   const id = req.params.id;
-  User.findByPk(id)
+  Membership.findByPk(id)
     .then(data => {
       if (data) {
         res.send(data);
@@ -73,21 +75,24 @@ exports.findOne = (req, res) => {
 // Update a Membership by the id in the request
 exports.update = (req, res) => {
   const id = req.params.id;
-  User.update(req.body, {
+  Membership.update(req.body, {
     where: { id: id }
   })
     .then(num => {
       if (num == 1) {
+        kafkaClient.sendActionMessage("MEMBERSHIP_UPDATE_SUCCESS", req.params)
         res.send({
           message: "Membership was updated successfully."
         });
       } else {
+        kafkaClient.sendActionMessage("MEMBERSHIP_UPDATE_FAIL", req.params)
         res.send({
           message: `Cannot update Membership with id=${id}. Maybe Membership was not found or req.body is empty!`
         });
       }
     })
     .catch(err => {
+      kafkaClient.sendActionMessage("MEMBERSHIP_UPDATE_FAIL", re.params)
       res.status(500).send({
         message: "Error updating Membership with id=" + id
       });
@@ -97,21 +102,24 @@ exports.update = (req, res) => {
 // Delete a Membership with the specified id in the request
 exports.delete = (req, res) => {
   const id = req.params.id;
-  User.destroy({
+  Membership.destroy({
     where: { id: id }
   })
     .then(num => {
       if (num == 1) {
+        kafkaClient.sendActionMessage("MEMBERSHIP_DELETE_SUCCESS", req.params)
         res.send({
           message: "Membership was deleted successfully!"
         });
       } else {
+        kafkaClient.sendActionMessage("MEMBERSHIP_DELETE_FAIL", req.params)
         res.send({
           message: `Cannot delete Membership with id=${id}. Maybe Membership was not found!`
         });
       }
     })
     .catch(err => {
+      kafkaClient.sendActionMessage("MEMBERSHIP_DELETE_FAIL", req.params)
       res.status(500).send({
         message: "Could not delete Membership with id=" + id
       });
@@ -120,39 +128,19 @@ exports.delete = (req, res) => {
 
 // Delete all Membership from the database.
 exports.deleteAll = (req, res) => {
-  User.destroy({
+  Membership.destroy({
     where: {},
     truncate: false
   })
     .then(nums => {
+      kafkaClient.sendActionMessage("MEMBERSHIP_FLUSH_SUCCESS", {})
       res.send({ message: `${nums} Membership were deleted successfully!` });
     })
     .catch(err => {
+      kafkaClient.sendActionMessage("MEMBERSHIP_FLUSH_FAIL", {})
       res.status(500).send({
         message:
           err.message || "Some error occurred while removing all Memberships."
       });
     });
 };
-
-function sendActionMessage(action, payload, traceId = uuidv4()) {
-  console.log("Sending message to topic :: " + kafkaConfig.KAFKA_TOPIC)
-  message = { "traceId": traceId, "action": action, "payload": payload }
-  if(action){
-    producer.send({
-      topic: kafkaConfig.KAFKA_TOPIC,
-      messages: [
-        {
-          key: null, value: JSON.stringify(message)
-        }
-      ],
-    }).then(()=>{
-      console.log("action message sent successfully")
-    })
-    .catch((err)=>{
-      console.log(err)
-    })
-  }else{
-    console.log("Action not specified")
-  }
-}
