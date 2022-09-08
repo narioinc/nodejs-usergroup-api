@@ -11,10 +11,10 @@ const consumer = kafkaClient.consumer;
 consumer.subscribe({ topic: 'userapi', fromBeginning: false })
 consumer.run({
   eachMessage: async ({ topic, partition, message, heartbeat, pause }) => {
-      console.log({
+      /*console.log({
           value: message.value.toString(),
           headers: message.headers,
-      })
+      })*/
   },
 })
 
